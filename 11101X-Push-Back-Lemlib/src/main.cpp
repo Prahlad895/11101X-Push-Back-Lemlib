@@ -1,13 +1,18 @@
 #include "main.h"
 #include "lemlib/api.hpp" // IWYU pragma: keep
+#include "math.h"
 
-// controller
+//controller
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
 
 // motor groups
-pros::MotorGroup leftMotors({-5, 4, -3},
-                            pros::MotorGearset::blue); // left motor group - ports 3 (reversed), 4, 5 (reversed)
-pros::MotorGroup rightMotors({6, -9, 7}, pros::MotorGearset::blue); // right motor group - ports 6, 7, 9 (reversed)
+pros::MotorGroup leftMotors({-10, -7, -9}, pros::MotorGearset::blue);
+pros::MotorGroup rightMotors({8, 2, 1}, pros::MotorGearset::blue);
+
+//intake Motor 
+pros::Motor bottom_intake(20, pros::v5::MotorGears::blue, pros::v5::MotorUnits::degrees);
+pros::Motor middle_intake(18, pros::v5::MotorGears::rpm_200, pros::v5::MotorUnits::degrees);
+pros::Motor top_intake(19, pros::v5::MotorGears::rpm_200, pros::v5::MotorUnits::degrees);
 
 // Inertial Sensor on port 10
 pros::Imu imu(10);
@@ -77,6 +82,71 @@ lemlib::ExpoDriveCurve steerCurve(3, // joystick deadband out of 127
 
 // create the chassis
 lemlib::Chassis chassis(drivetrain, linearController, angularController, sensors, &throttleCurve, &steerCurve);
+
+//intake functions
+void move_bottom_intake(double power){
+    bottom_intake.move_velocity(power);
+}
+
+void move_middle_intake(double power){
+    middle_intake.move_velocity(power);
+}
+
+void move_top_intake(double power){
+    top_intake.move_velocity(power);
+}
+
+void intake_block() {
+    move_bottom_intake(600);
+    move_middle_intake(600);
+    move_top_intake(-600);
+}
+
+void outtake_block() {
+    move_bottom_intake(-600);
+    move_middle_intake(-600);
+    move_top_intake(-600);
+}
+
+void score_middle_goal() {
+    move_bottom_intake(600);
+    move_middle_intake(-600);
+    move_top_intake(-600);
+}
+
+void score_high_goal() {
+    move_bottom_intake(600);
+    move_middle_intake(-600);
+    move_top_intake(600);
+}
+
+void stop_intake() {
+    move_bottom_intake(0);
+    move_middle_intake(0);
+    move_top_intake(0);
+}
+
+void intake_control(){
+    while (true) {
+        if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {
+            score_high_goal();
+        }
+        else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {
+            score_middle_goal();
+        }
+        else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {
+            intake_block();
+        }
+        else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2)) {
+            outtake_block();
+        }
+        else {
+            stop_intake();
+        }
+        pros::delay(10);
+    }
+}
+
 
 /**
  * Runs initialization code. This occurs as soon as the program is started.
@@ -165,13 +235,41 @@ void autonomous() {
 void opcontrol() {
     // controller
     // loop to continuously update motors
+   //intake
+    pros::Task intake_control_task(intake_control);
+
     while (true) {
         // get joystick positions
         int leftY = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
-        int rightX = controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
+        int leftX = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X);
+        //stickdrift correction
+        if (fabs(leftY) < 10) leftY = 0;
+        if (fabs(leftX) < 10) leftX = 0;
         // move the chassis with curvature drive
-        chassis.arcade(leftY, rightX);
+        chassis.arcade(leftY, leftX, false, 0.75);
+        
         // delay to save resources
-        pros::delay(10);
+        pros::delay(10); 
     }
+}
+
+//autons
+void left_qual() {
+
+}
+
+void right_qual() {
+
+}
+
+void left_elim() {
+
+}
+
+void right_elim() {
+
+}
+
+void skills() {
+
 }
