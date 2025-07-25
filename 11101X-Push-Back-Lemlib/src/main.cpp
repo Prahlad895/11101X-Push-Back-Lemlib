@@ -1,6 +1,7 @@
 #include "main.h"
 #include "lemlib/api.hpp" // IWYU pragma: keep
 #include "math.h"
+#include "pros/adi.h"
 
 //controller
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
@@ -10,12 +11,15 @@ pros::MotorGroup leftMotors({-10, -7, -9}, pros::MotorGearset::blue);
 pros::MotorGroup rightMotors({8, 2, 1}, pros::MotorGearset::blue);
 
 //intake Motor 
-pros::Motor bottom_intake(20, pros::v5::MotorGears::blue, pros::v5::MotorUnits::degrees);
+pros::Motor bottom_intake(11, pros::v5::MotorGears::blue, pros::v5::MotorUnits::degrees);
 pros::Motor middle_intake(18, pros::v5::MotorGears::rpm_200, pros::v5::MotorUnits::degrees);
 pros::Motor top_intake(19, pros::v5::MotorGears::rpm_200, pros::v5::MotorUnits::degrees);
 
 // Inertial Sensor on port 10
 pros::Imu imu(10);
+
+//will
+pros::adi::DigitalOut matchload('g');
 
 // tracking wheels
 // horizontal tracking wheel encoder. Rotation sensor, port 20, not reversed
@@ -32,7 +36,7 @@ lemlib::Drivetrain drivetrain(&leftMotors, // left motor group
                               &rightMotors, // right motor group
                               10, // 10 inch track width
                               lemlib::Omniwheel::NEW_4, // using new 4" omnis
-                              360, // drivetrain rpm is 360
+                              450, // drivetrain rpm is 360
                               2 // horizontal drift is 2. If we had traction wheels, it would have been 8
 );
 
@@ -109,8 +113,8 @@ void outtake_block() {
 }
 
 void score_middle_goal() {
-    move_bottom_intake(600);
-    move_middle_intake(-600);
+    move_bottom_intake(200);
+    move_middle_intake(-200);
     move_top_intake(-600);
 }
 
@@ -130,9 +134,12 @@ void intake_control(){
     while (true) {
         if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {
             score_high_goal();
+            matchload.set_value(false);
+
         }
         else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {
             score_middle_goal();
+            matchload.set_value(true);
         }
         else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {
             intake_block();
@@ -147,7 +154,18 @@ void intake_control(){
     }
 }
 
-
+bool matchloadstate = false;
+void matchloadfunc() {
+    // Check if the button is pressed
+    if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_X)) {
+        matchloadstate = !matchloadstate;  // Toggle the state
+        
+        // Set mogo and mogo2 based on the new state
+        matchload.set_value(matchloadstate);
+        // Add a small delay to prevent multiple toggles from a single press
+        //pros::delay(350);  // Adjust the delay as needed
+    }
+}
 /**
  * Runs initialization code. This occurs as soon as the program is started.
  *
@@ -242,6 +260,8 @@ void opcontrol() {
         // get joystick positions
         int leftY = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
         int leftX = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X);
+
+        matchloadfunc();
         //stickdrift correction
         if (fabs(leftY) < 10) leftY = 0;
         if (fabs(leftX) < 10) leftX = 0;
