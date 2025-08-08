@@ -19,7 +19,9 @@ pros::Motor top_intake(19, pros::v5::MotorGears::rpm_200, pros::v5::MotorUnits::
 pros::Imu imu(10);
 
 //will
-pros::adi::DigitalOut matchload('g');
+pros::adi::DigitalOut matchload('h');
+pros::adi::DigitalOut aligner('g');
+
 
 // tracking wheels
 // horizontal tracking wheel encoder. Rotation sensor, port 20, not reversed
@@ -87,6 +89,10 @@ lemlib::ExpoDriveCurve steerCurve(3, // joystick deadband out of 127
 // create the chassis
 lemlib::Chassis chassis(drivetrain, linearController, angularController, sensors, &throttleCurve, &steerCurve);
 
+//variables
+bool matchloadstate = false;
+bool alignerstate = false;
+
 //intake functions
 void move_bottom_intake(double power){
     bottom_intake.move_velocity(power);
@@ -134,12 +140,26 @@ void intake_control(){
     while (true) {
         if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {
             score_high_goal();
-            matchload.set_value(false);
+            if(matchloadstate==true){
+                matchload.set_value(false);
+                matchloadstate=false;
+            }
 
+             if(alignerstate==false){
+                aligner.set_value(true);
+                alignerstate=true;
+            }
         }
         else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {
             score_middle_goal();
-            matchload.set_value(true);
+            if(matchloadstate==false){
+                matchload.set_value(true);
+                matchloadstate=true;
+            }
+            if (alignerstate==true) {
+                alignerstate=false;
+                aligner.set_value(false);
+            }
         }
         else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {
             intake_block();
@@ -154,7 +174,7 @@ void intake_control(){
     }
 }
 
-bool matchloadstate = false;
+
 void matchloadfunc() {
     // Check if the button is pressed
     if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_X)) {
@@ -162,6 +182,18 @@ void matchloadfunc() {
         
         // Set mogo and mogo2 based on the new state
         matchload.set_value(matchloadstate);
+        // Add a small delay to prevent multiple toggles from a single press
+        //pros::delay(350);  // Adjust the delay as needed
+    }
+}
+
+void alignerfunc() {
+    // Check if the button is pressed
+    if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A)) {
+        alignerstate = !alignerstate;  // Toggle the state
+        
+        // Set mogo and mogo2 based on the new state
+        aligner.set_value(alignerstate);
         // Add a small delay to prevent multiple toggles from a single press
         //pros::delay(350);  // Adjust the delay as needed
     }
